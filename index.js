@@ -1,6 +1,12 @@
+const path = require('path');
+const arrify = require('arrify');
 const formatter = require('stylelint').formatters.string
 const runner = require('./lib/runner')
 const emitter = require('./lib/emitter')
+
+const defaultFiles = [
+  '**/*.s?(c|a)ss'
+]
 
 class EasyStylelintPlugin {
   constructor (options = {}) {
@@ -26,18 +32,23 @@ class EasyStylelintPlugin {
       delete options.failOnError
     }
 
-    this.__options = Object.assign({
-      files: ['**/*.s?(c|a)ss'],
-      formatter
-    }, options)
-
+    this.options = options
     this.errors = []
     this.warnings = []
   }
 
   apply (compiler) {
+    const context = this.options.context || compiler.context
+
+    const options = Object.assign({
+      formatter
+    }, this.options, {
+      files: arrify(this.options.files || defaultFiles).map(file => path.resolve(context, file)),
+      context
+    })
+
     if (this.changesOnly) {
-      const emitFn = emitter.bind(null, this, this.__options, compiler)
+      const emitFn = emitter.bind(null, this, options, compiler)
 
       if (compiler.hooks) {
         compiler.hooks.emit.tapAsync('EasyStylelintPlugin', emitFn)
@@ -45,7 +56,7 @@ class EasyStylelintPlugin {
         compiler.plugin('emit', emitFn)
       }
     } else {
-      const runFn = runner.bind(null, this, this.__options)
+      const runFn = runner.bind(null, this, options)
 
       if (compiler.hooks) {
         compiler.hooks.run.tapAsync('EasyStylelintPlugin', runFn)
